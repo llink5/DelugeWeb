@@ -102,6 +102,22 @@ import StatusBar from '@/components/StatusBar.vue'
               <span class="hidden lg:inline text-sm">Perf</span>
             </router-link>
           </li>
+          <li>
+            <router-link
+              to="/docs"
+              class="flex items-center gap-3 px-3 py-2.5 rounded-lg mx-2 transition"
+              active-class="bg-blue-500/10 text-blue-400"
+              :class="[$route.path === '/docs' ? '' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50']"
+            >
+              <svg class="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 3h9l4 4v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+                <path d="M13 3v4h4" />
+                <line x1="6" y1="10" x2="14" y2="10" />
+                <line x1="6" y1="13" x2="11" y2="13" />
+              </svg>
+              <span class="hidden lg:inline text-sm">Docs</span>
+            </router-link>
+          </li>
         </ul>
 
         <!-- Version -->

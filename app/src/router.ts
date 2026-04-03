@@ -31,6 +31,10 @@ const router = createRouter({
       path: '/perf',
       component: () => import('./modules/perf-trace/PerfTraceView.vue'),
     },
+    {
+      path: '/docs',
+      component: () => import('./modules/param-docs/ParamDocsView.vue'),
+    },
   ],
 })
 
