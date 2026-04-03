@@ -1,0 +1,38 @@
+name: Update Parameter Database
+
+on:
+  schedule:
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update-params:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone DelugeFirmware
+        run: git clone --depth 1 https://github.com/SynthstromAudible/DelugeFirmware.git /tmp/firmware
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Extract parameters
+        run: node scripts/extract-parameters.js /tmp/firmware > app/src/modules/param-docs/data/parameters.json
+
+      - name: Check for changes
+        id: diff
+        run: git diff --quiet app/src/modules/param-docs/data/parameters.json || echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: Commit and push
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "Parameter Bot"
+          git config user.email "noreply@users.noreply.github.com"
+          git add app/src/modules/param-docs/data/parameters.json
+          git commit -m "docs: update parameter database from firmware source"
+          git push
