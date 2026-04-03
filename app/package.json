@@ -1,0 +1,27 @@
+{
+  "name": "deluge-web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Deluge Web Tools — Manage your Synthstrom Deluge from the browser",
+  "scripts": {
+    "dev": "vite",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "deep-diff": "^1.0.2",
+    "uplot": "^1.6.31",
+    "vue": "^3.5.13",
+    "vue-router": "^4.5.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.4",
+    "@types/deep-diff": "^1.0.5",
+    "@vitejs/plugin-vue": "^5.2.3",
+    "tailwindcss": "^4.1.4",
+    "typescript": "^5.7.3",
+    "vite": "^6.3.2",
+    "vue-tsc": "^2.2.8"
+  }
+}
