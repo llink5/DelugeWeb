@@ -35,6 +35,10 @@ const router = createRouter({
       path: '/docs',
       component: () => import('./modules/param-docs/ParamDocsView.vue'),
     },
+    {
+      path: '/debug',
+      component: () => import('./modules/debug-tools/DebugToolsView.vue'),
+    },
   ],
 })
 

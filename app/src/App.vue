@@ -118,6 +118,21 @@ import StatusBar from '@/components/StatusBar.vue'
               <span class="hidden lg:inline text-sm">Docs</span>
             </router-link>
           </li>
+          <li>
+            <router-link
+              to="/debug"
+              class="flex items-center gap-3 px-3 py-2.5 rounded-lg mx-2 transition"
+              active-class="bg-blue-500/10 text-blue-400"
+              :class="[$route.path === '/debug' ? '' : 'text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50']"
+            >
+              <svg class="w-5 h-5 shrink-0" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="10" cy="10" r="7" />
+                <path d="M3 10h2M15 10h2M10 3v2M10 15v2" />
+                <circle cx="10" cy="10" r="2" />
+              </svg>
+              <span class="hidden lg:inline text-sm">Debug</span>
+            </router-link>
+          </li>
         </ul>
 
         <!-- Version -->

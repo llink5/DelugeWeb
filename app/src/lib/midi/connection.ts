@@ -9,6 +9,13 @@ const DEFAULT_TIMEOUT = 10_000
 const READ_BLOCK = 512
 const WRITE_BLOCK = 512
 const DIR_PAGE_SIZE = 20
+const MEM_MAX_TRANSFER = 512
+
+const MEM_STATUS_NAMES: Record<number, string> = {
+  0x00: 'OK',
+  0x01: 'BAD_RANGE',
+  0x02: 'BAD_FORMAT',
+}
 
 class MidiConnection {
   private static instance: MidiConnection
@@ -21,6 +28,7 @@ class MidiConnection {
   private callbacks = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }>()
   private debugCallback: ((text: string) => void) | null = null
   private displayCallbacks = new Set<(type: 'oled' | '7seg', data: Uint8Array) => void>()
+  private memAccessPending: { resolve: (v: any) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> } | null = null
   private boundHandleMessage = this.handleMessage.bind(this)
   private boundStateChange = this.handleStateChange.bind(this)
 
@@ -186,6 +194,41 @@ class MidiConnection {
       const type: 'oled' | '7seg' = subType === 0x01 ? '7seg' : 'oled'
       for (const cb of this.displayCallbacks) {
         try { cb(type, raw) } catch { /* ignore */ }
+      }
+      return
+    }
+
+    // MemAccess reply (0x06)
+    if (cmd === 0x06) {
+      if (!this.memAccessPending || d.length < 8) return
+      const subCmd = d[6]
+      const status = d[7]
+      const pending = this.memAccessPending
+      this.memAccessPending = null
+      clearTimeout(pending.timer)
+
+      if (status !== 0x00) {
+        pending.reject(new Error(`MemAccess error: ${MEM_STATUS_NAMES[status] ?? `0x${status.toString(16)}`}`))
+        return
+      }
+
+      if (subCmd === 0x02) {
+        // Ping: version string follows status byte
+        const verBytes = d.slice(8, d.length - 1)
+        const version = new TextDecoder().decode(verBytes)
+        pending.resolve(version)
+      } else if (subCmd === 0x00) {
+        // Read: [status][addr x5][len x2][packed_data...]F7
+        if (d.length < 16) { pending.reject(new Error('MemAccess read: response too short')); return }
+        const readLen = (d[13] & 0x7f) | ((d[14] & 0x07) << 7)
+        const packedStart = 15
+        const packedEnd = d.length - 1 // before F7
+        const packed = new Uint8Array(Array.from(d.slice(packedStart, packedEnd)))
+        const unpacked = MidiConnection.unpack7to8(packed, 0, packed.length)
+        pending.resolve(unpacked.slice(0, readLen))
+      } else if (subCmd === 0x01) {
+        // Write: just status OK
+        pending.resolve(undefined)
       }
       return
     }
@@ -435,6 +478,88 @@ class MidiConnection {
       }
     }
     await this.deleteItem(path)
+  }
+
+  // ── MemAccess (Command 0x06) ────────────────────────────────────────
+
+  private sendMemAccess<T>(payload: number[]): Promise<T> {
+    if (!this.output) return Promise.reject(new Error('Not connected'))
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.memAccessPending = null
+        reject(new Error('MemAccess timeout'))
+      }, DEFAULT_TIMEOUT)
+      this.memAccessPending = { resolve, reject, timer }
+      this.sendSysEx([...HEADER, 0x06, ...payload, SYSEX_END])
+    })
+  }
+
+  private static encodeAddr(addr: number): number[] {
+    return [
+      addr & 0x7f,
+      (addr >>> 7) & 0x7f,
+      (addr >>> 14) & 0x7f,
+      (addr >>> 21) & 0x7f,
+      (addr >>> 28) & 0x0f,
+    ]
+  }
+
+  private static encodeLen(len: number): number[] {
+    return [len & 0x7f, (len >>> 7) & 0x07]
+  }
+
+  async memPing(): Promise<string> {
+    return this.sendMemAccess<string>([0x02])
+  }
+
+  async memRead(addr: number, length: number): Promise<Uint8Array> {
+    if (length <= MEM_MAX_TRANSFER) {
+      return this.sendMemAccess<Uint8Array>([
+        0x00,
+        ...MidiConnection.encodeAddr(addr),
+        ...MidiConnection.encodeLen(length),
+      ])
+    }
+    // Auto-chunking for large reads
+    const result = new Uint8Array(length)
+    let offset = 0
+    while (offset < length) {
+      const chunk = Math.min(MEM_MAX_TRANSFER, length - offset)
+      const data = await this.sendMemAccess<Uint8Array>([
+        0x00,
+        ...MidiConnection.encodeAddr(addr + offset),
+        ...MidiConnection.encodeLen(chunk),
+      ])
+      result.set(data, offset)
+      offset += chunk
+    }
+    return result
+  }
+
+  async memWrite(addr: number, data: Uint8Array): Promise<void> {
+    if (data.length <= MEM_MAX_TRANSFER) {
+      const packed = MidiConnection.pack8to7(data, 0, data.length)
+      await this.sendMemAccess<void>([
+        0x01,
+        ...MidiConnection.encodeAddr(addr),
+        ...MidiConnection.encodeLen(data.length),
+        ...Array.from(packed),
+      ])
+      return
+    }
+    let offset = 0
+    while (offset < data.length) {
+      const chunk = Math.min(MEM_MAX_TRANSFER, data.length - offset)
+      const slice = data.subarray(offset, offset + chunk)
+      const packed = MidiConnection.pack8to7(slice, 0, slice.length)
+      await this.sendMemAccess<void>([
+        0x01,
+        ...MidiConnection.encodeAddr(addr + offset),
+        ...MidiConnection.encodeLen(chunk),
+        ...Array.from(packed),
+      ])
+      offset += chunk
+    }
   }
 
   // ── Debug stream ───────────────────────────────────────────────────
