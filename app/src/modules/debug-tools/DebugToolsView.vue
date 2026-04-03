@@ -2,9 +2,10 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { midi } from '@/lib/midi'
 import HexDump from './HexDump.vue'
+import MemoryMap from './MemoryMap.vue'
 
 const connected = ref(midi.isConnected)
-const activeTab = ref<'ping' | 'read' | 'watch' | 'pointer'>('ping')
+const activeTab = ref<'map' | 'ping' | 'read' | 'watch' | 'pointer'>('map')
 const memAvailable = ref<boolean | null>(null)
 
 // Ping
@@ -161,6 +162,17 @@ async function doPointerChase() {
 
 const ptrOffsetEntries = ref<string[]>(['0'])
 
+function onMapNavigateRead(addr: number, len: number) {
+  readAddr.value = addr.toString(16).padStart(8, '0')
+  readLen.value = len
+  activeTab.value = 'read'
+}
+
+function onMapNavigatePointer(addr: number) {
+  ptrAddr.value = addr.toString(16).padStart(8, '0')
+  activeTab.value = 'pointer'
+}
+
 function addPtrOffset() {
   ptrOffsetEntries.value.push('0')
 }
@@ -187,12 +199,20 @@ function removePtrOffset(idx: number) {
     <!-- Tabs -->
     <div class="flex gap-1 border-b border-zinc-800">
       <button
-        v-for="tab in (['ping', 'read', 'watch', 'pointer'] as const)"
+        v-for="tab in (['map', 'ping', 'read', 'watch', 'pointer'] as const)"
         :key="tab"
         class="px-4 py-2 text-sm capitalize transition"
         :class="activeTab === tab ? 'text-blue-400 border-b-2 border-blue-400' : 'text-zinc-400 hover:text-zinc-200'"
         @click="activeTab = tab"
       >{{ tab }}</button>
+    </div>
+
+    <!-- Map Tab -->
+    <div v-if="activeTab === 'map'">
+      <MemoryMap
+        @navigate-read="onMapNavigateRead"
+        @navigate-pointer="onMapNavigatePointer"
+      />
     </div>
 
     <!-- Ping Tab -->
