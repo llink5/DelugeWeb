@@ -117,7 +117,6 @@ const DETAIL_HEIGHT = 40
 const GAP = 3
 const LABEL_MIN_WIDTH = 80
 const MIN_BLOCK_WIDTH = 32
-const MARKER_HEIGHT = 24
 const VIEW_WIDTH = 1000
 const PADDING = 16
 
@@ -136,6 +135,7 @@ interface MarkerLayout {
   marker: Marker
   x: number
   y: number
+  labelVisible: boolean
 }
 
 const layout = computed(() => {
@@ -206,44 +206,53 @@ const layout = computed(() => {
     mainAxis += w + GAP
   }
 
-  // Markers
-  const markerY = maxY + MARKER_HEIGHT + 8
+  // Markers — place inside their target region block
+  // Each marker maps to a preferred sub-region and a fallback parent region
+  const markerTargets: { marker: Marker; subName: string; parentName: string }[] = [
+    { marker: markers[0], subName: '.heap', parentName: 'Internal SRAM' },
+    { marker: markers[1], subName: '.sdram_bss', parentName: 'SDRAM' },
+    { marker: markers[2], subName: '.bss + .text + .rodata + .data', parentName: 'Internal SRAM' },
+  ]
 
-  for (const m of markers) {
-    let mx = PADDING
-    if (m.addr !== undefined) {
-      // Find which main region this falls into
-      for (const b of blocks) {
-        if (m.addr >= b.region.start && m.addr < b.region.end) {
-          const frac = (m.addr - b.region.start) / (b.region.end - b.region.start)
-          mx = b.x + frac * b.w
-          break
-        }
-      }
-    } else if (m.region === 'heap') {
-      // Place in heap sub-region or SRAM
-      const heapBlock = blocks.find(b => b.region.name === '.heap')
-      if (heapBlock) mx = heapBlock.x + heapBlock.w * 0.5
-      else {
-        const sramBlock = blocks.find(b => b.region.name === 'Internal SRAM')
-        if (sramBlock) mx = sramBlock.x + sramBlock.w * 0.7
-      }
-    } else if (m.region === 'sdram_bss') {
-      const bssBlock = blocks.find(b => b.region.name === '.sdram_bss')
-      if (bssBlock) mx = bssBlock.x + bssBlock.w * 0.5
-      else {
-        const sdramBlock = blocks.find(b => b.region.name === 'SDRAM')
-        if (sdramBlock) mx = sdramBlock.x + sdramBlock.w * 0.2
-      }
-    } else if (m.region === 'sram') {
-      const sramBlock = blocks.find(b => b.region.name === 'Internal SRAM')
-      if (sramBlock) mx = sramBlock.x + sramBlock.w * 0.3
+  // Group markers by their target parent to offset them when collapsed
+  const parentGroups = new Map<string, number>()
+
+  for (const mt of markerTargets) {
+    const subBlock = blocks.find(b => b.region.name === mt.subName && b.isDetail)
+    const parentBlock = blocks.find(b => b.region.name === mt.parentName && !b.isDetail)
+
+    let targetBlock: BlockLayout | undefined
+    if (subBlock) {
+      targetBlock = subBlock
+    } else if (parentBlock) {
+      targetBlock = parentBlock
     }
 
-    markerLayouts.push({ marker: m, x: mx, y: markerY })
+    if (targetBlock) {
+      let mx: number
+      let my: number
+
+      if (subBlock) {
+        // Expanded: place inside the sub-region, vertically centered
+        mx = subBlock.x + 8
+        my = subBlock.y + subBlock.h / 2
+      } else {
+        // Collapsed: place inside parent, horizontally offset per marker
+        const groupIdx = parentGroups.get(mt.parentName) ?? 0
+        parentGroups.set(mt.parentName, groupIdx + 1)
+        mx = targetBlock.x + 8 + groupIdx * 60
+        my = targetBlock.y + targetBlock.h - 10
+      }
+
+      // Check if there's enough space for a label (dot at mx, label needs ~50px to the right)
+      const spaceRight = targetBlock.x + targetBlock.w - mx - 6
+      const labelVisible = spaceRight >= 50
+
+      markerLayouts.push({ marker: mt.marker, x: mx, y: my, labelVisible })
+    }
   }
 
-  const totalHeight = markerLayouts.length > 0 ? markerY + MARKER_HEIGHT + PADDING : maxY + PADDING
+  const totalHeight = maxY + PADDING
   const totalWidth = mainAxis + PADDING + panOffset.value
 
   return { blocks, markers: markerLayouts, totalHeight, totalWidth }
@@ -295,10 +304,32 @@ const verticalLayout = computed(() => {
     }
   }
 
-  // Markers in vertical mode — just list them
-  for (const m of markers) {
-    markerLayouts.push({ marker: m, x: PADDING + 8, y: y + 4 })
-    y += MARKER_HEIGHT + 4
+  // Markers in vertical mode — place inside their target blocks
+  const vMarkerTargets: { marker: Marker; subName: string; parentName: string }[] = [
+    { marker: markers[0], subName: '.heap', parentName: 'Internal SRAM' },
+    { marker: markers[1], subName: '.sdram_bss', parentName: 'SDRAM' },
+    { marker: markers[2], subName: '.bss + .text + .rodata + .data', parentName: 'Internal SRAM' },
+  ]
+  const vParentGroups = new Map<string, number>()
+
+  for (const mt of vMarkerTargets) {
+    const subBlock = blocks.find(b => b.region.name === mt.subName && b.isDetail)
+    const parentBlock = blocks.find(b => b.region.name === mt.parentName && !b.isDetail)
+    const targetBlock = subBlock ?? parentBlock
+
+    if (targetBlock) {
+      let mx: number, my: number
+      if (subBlock) {
+        mx = subBlock.x + 8
+        my = subBlock.y + subBlock.h / 2
+      } else {
+        const groupIdx = vParentGroups.get(mt.parentName) ?? 0
+        vParentGroups.set(mt.parentName, groupIdx + 1)
+        mx = targetBlock.x + 8 + groupIdx * 70
+        my = targetBlock.y + targetBlock.h - 10
+      }
+      markerLayouts.push({ marker: mt.marker, x: mx, y: my, labelVisible: true })
+    }
   }
 
   return { blocks, markers: markerLayouts, totalHeight: y + PADDING, totalWidth: VIEW_WIDTH }
@@ -487,55 +518,32 @@ const patternId = 'stripe-pattern'
           >{{ formatAddr(b.region.start) }} · {{ formatSize(b.region.start, b.region.end) }}</text>
         </g>
 
-        <!-- Marker pins -->
+        <!-- Marker pins — small dots inside region blocks -->
         <g v-for="(m, idx) in activeLayout.markers" :key="`marker-${idx}`">
-          <!-- Pin line -->
-          <line
-            v-if="!isVertical"
-            :x1="m.x"
-            :y1="m.y - 16"
-            :x2="m.x"
-            :y2="m.y - 4"
-            stroke="#a78bfa"
-            stroke-width="1.5"
-            stroke-dasharray="2 2"
-            class="pointer-events-none"
-          />
-          <!-- Pin dot -->
+          <!-- Dot (6px diameter) -->
           <circle
-            v-if="!isVertical"
             :cx="m.x"
-            :cy="m.y - 18"
+            :cy="m.y"
             r="3"
             fill="#a78bfa"
-            class="pointer-events-none"
-          />
-          <!-- Label bg -->
-          <rect
-            :x="isVertical ? m.x : m.x - 4"
-            :y="m.y"
-            :width="isVertical ? 200 : Math.max(m.marker.name.length * 7 + 16, 80)"
-            height="20"
-            rx="4"
-            fill="#a78bfa"
-            fill-opacity="0.15"
-            stroke="#a78bfa"
+            stroke="#7c3aed"
             stroke-width="1"
-            stroke-opacity="0.4"
-            class="cursor-pointer hover:fill-opacity-30 transition-all"
+            class="cursor-pointer"
             @click="onMarkerClick(m.marker)"
             @mouseenter="showMarkerTooltip($event, m.marker)"
             @mouseleave="hideTooltip"
           />
-          <!-- Label text -->
+          <!-- Inline label (only when space allows) -->
           <text
-            :x="(isVertical ? m.x : m.x - 4) + 8"
-            :y="m.y + 14"
-            font-size="10"
-            font-weight="500"
+            v-if="m.labelVisible"
+            :x="m.x + 6"
+            :y="m.y + 3"
+            font-size="8"
+            font-weight="600"
             fill="#a78bfa"
+            fill-opacity="0.9"
             class="pointer-events-none"
-          >{{ m.marker.name }}: {{ m.marker.type }}</text>
+          >{{ m.marker.name }}</text>
         </g>
       </svg>
     </div>
