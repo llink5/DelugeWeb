@@ -1,57 +1,37 @@
+# Deluge Web Tools
 
-#### The DelugeWeb project is still in its early stages. At this writing, we have:
+Browser-based tools for the Synthstrom Audible Deluge. No installation needed — just connect your Deluge via USB and open the link.
 
-* vuefinder - which uses USB Midi connections to browse (and upload and download) stuff from the Deluge SD card.
-* delugeclient - a simple web application for getting debug info from the Deluge. Not updated recently.
-* catnip - a web application for displaying debug information. Also not active.
-* downrush/waverly - a program for editing .WAV files using an old version of WaveSurfer.
-* downrush/viewScore - a program for viewing Deluge XML files such as KIT, SYNTH, and SONG.
-    downrush stuff runs mostly, but has not been updated to show new Community Edition features.
+**[→ Open Deluge Web Tools](https://llink5.github.io/DelugeWeb/)**
 
-#### How to build DelugeWeb projects:
+Requires Community Firmware ≥ 1.3.0 and a WebMIDI-compatible browser (Chrome recommended).
 
-1) Install the Node Package Manager (npm).
-2) checkout the complete DelugeWeb repository.
-   ```git
-   git clone https://github.com/SynthstromAudible/DelugeWeb.git
-     ```
-3) change to the DelugeWeb directory.
-4) for each subproject of interest, change to the directory for that project. Example: ```cd vuefinder```.
-5) Install the dependencies for the given subproject by entering ``npm install``
-6) Build the project for development by entering ``npm run dev``
-7) Make sure your Deluge is running a recent build that has Web SysEx support running and is connected to your computer via USB. Check and make sure using another Midi-capable program like Ableton Live.
-8) Go to the web browser (Chrome recommended) and visit the URL: ``http://localhost:5173`` (or whatever the npm run dev command says).
-9) Press the "home" icon which should cause the SD card contents to be displayed (at the root level).
+## Features
 
-We generally use vite to coordinate the compilation and execution of our web apps. You can use ``npm run build`` to create a build file to upload to a hosting provider.
+- **Preset Manager** — Browse, compare and diff your synth/kit presets
+- **File Browser** — Upload, download, rename and delete files on the SD card
+- **Preset Editor** — View and edit sound parameters
+- **Display Mirror** — See the Deluge OLED/7-Segment display in your browser
+- **Performance Trace** — Visualize debug events and timing
+- **Wave Editor** — Coming soon
 
-You can test your application under the https "secure" browser scheme by changing the following lines to not be commented-out:
+## Usage
 
-```
-	/* uncomment this block to enable https. You may need to change some settings so this will actually work in Chrome.
-		server: {
-	  port: 8000,
-    https: {
-      key: fs.readFileSync('./certs/key.pem'),
-      cert: fs.readFileSync('./certs/certificate.pem'),
-    },
-  },
-  	preview: {
-	  port: 8000,
-    https: {
-      key: fs.readFileSync('./certs/key.pem'),
-      cert: fs.readFileSync('./certs/certificate.pem'),
-    },
-  },
- */
-```
+1. Connect your Deluge to your computer via USB
+2. Open the link above in Chrome
+3. Click "Connect" and select your Deluge
+4. Done
 
-#### A Note on https:
+## For Developers
+git clone https://github.com/llink5/DelugeWeb.git
+cd DelugeWeb/app
+npm install
+npm run dev
 
-There are a few features, like using the microphone to input samples, that require running from a "secure context". They don't want people turning on your camera or microphone without asking.
+## Credits
 
-Chrome, like most other browsers, does not want you to open locally hosted content as "secure content", and must be told how to enable this. The "How To" do this keeps changing and many of the online instructions are wrong. I had to take the 'certificate.pem' and import that into the MacOS key-ring. This is another process that keeps changing and most of the online instructions are wrong. There may also be a browser setting somewhere that you need to change.
+Built on the original work by Jamie Fenton (vuefinder, midilib, viewScore, delugeclient, catnip).
 
-I am not giving specific instructions on how to cope with this, because I tried so many things trying to get this to work that I don't remember which magic incantations actually accomplished anything. You are on your own.
+## License
 
-You should be able to get most everything done without turning https on. If you find something that requires testing under https, you may be better off just uploading the stuff in the build directory to a hosting provider.
+GPL-3.0
