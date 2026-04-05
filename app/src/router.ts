@@ -24,12 +24,28 @@ const router = createRouter({
       component: () => import('./modules/display-mirror/DisplayMirrorView.vue'),
     },
     {
+      path: '/emulator',
+      component: () => import('./modules/emulator/EmulatorView.vue'),
+    },
+    {
+      path: '/virtual-hardware',
+      component: () => import('./modules/virtual-hardware/VirtualHardwareView.vue'),
+    },
+    {
+      path: '/symbols',
+      component: () => import('./modules/symbol-debugger/SymbolDebuggerView.vue'),
+    },
+    {
       path: '/waves',
       component: () => import('./modules/wave-editor/WaveEditorView.vue'),
     },
     {
       path: '/perf',
       component: () => import('./modules/perf-trace/PerfTraceView.vue'),
+    },
+    {
+      path: '/debug',
+      component: () => import('./modules/debug-tools/DebugToolsView.vue'),
     },
     {
       path: '/docs',
