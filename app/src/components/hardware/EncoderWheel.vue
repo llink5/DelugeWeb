@@ -34,7 +34,6 @@ const dragging = ref(false)
 let lastY = 0
 
 function onWheel(ev: WheelEvent) {
-  ev.preventDefault()
   emit('turn', ev.deltaY > 0 ? 1 : -1)
 }
 
@@ -76,7 +75,7 @@ function onMouseDown(ev: MouseEvent) {
       :style="{ width: size + 'px', height: size + 'px' }"
       class="relative cursor-pointer rounded-full bg-gradient-to-b from-slate-500 to-slate-800 shadow-inner"
       :class="pressed ? 'scale-95' : ''"
-      @wheel.passive="onWheel"
+      @wheel.prevent="onWheel"
       @mousedown="onMouseDown"
     >
       <!-- Rotation indicator -->

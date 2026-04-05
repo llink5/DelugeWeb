@@ -42,6 +42,7 @@ const running = ref(false)
 const elfLoaded = ref(false)
 const errorMessage = ref('')
 const debugMode = ref(false)
+const isDragging = ref(false)
 
 // Feed data from the emulator to VirtualHardwareView via props.
 // 128×48 OLED framebuffer (Deluge is 6 pages = 48px). Worker emits 1024
@@ -132,6 +133,48 @@ async function onFileChange(event: Event) {
   const file = input.files?.[0]
   input.value = ''
   if (!file) return
+  if (!ready.value) {
+    try {
+      await bootEmulator()
+    } catch {
+      return
+    }
+  }
+  try {
+    const { buffer } = await loadElfFromFile(file)
+    await loadFirmware(buffer)
+  } catch (e) {
+    errorMessage.value = e instanceof Error ? e.message : String(e)
+  }
+}
+
+function onDragOver(event: DragEvent) {
+  event.preventDefault()
+  isDragging.value = true
+}
+
+function onDragLeave() {
+  isDragging.value = false
+}
+
+async function onDrop(event: DragEvent) {
+  event.preventDefault()
+  isDragging.value = false
+  const file = event.dataTransfer?.files?.[0]
+  if (!file) return
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  if (ext !== 'bin' && ext !== 'elf') {
+    errorMessage.value = `Unsupported file type ".${ext}" — drop a .bin or .elf firmware image`
+    return
+  }
+  if (!ready.value) {
+    // Auto-boot when user drops a file before booting
+    try {
+      await bootEmulator()
+    } catch {
+      return
+    }
+  }
   try {
     const { buffer } = await loadElfFromFile(file)
     await loadFirmware(buffer)
@@ -327,7 +370,11 @@ const statusClass = computed(() => {
 <template>
   <div
     class="emulator-view flex flex-col gap-3 p-4"
+    :class="isDragging ? 'ring-2 ring-sky-400/60 bg-sky-500/5' : ''"
     data-testid="emulator-view"
+    @drop="onDrop"
+    @dragover="onDragOver"
+    @dragleave="onDragLeave"
   >
     <!-- Toolbar -->
     <header
@@ -375,10 +422,9 @@ const statusClass = computed(() => {
       <button
         type="button"
         data-testid="load-elf"
-        class="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 disabled:opacity-40 dark:border-slate-600 dark:hover:bg-slate-700"
-        :disabled="!ready"
+        class="rounded border border-slate-300 px-2 py-1 text-xs hover:bg-slate-100 dark:border-slate-600 dark:hover:bg-slate-700"
         @click="fileInput?.click()"
-        title="Load .bin or .elf firmware"
+        title="Load .bin or .elf firmware (auto-boots worker if needed)"
       >
         Load firmware…
       </button>

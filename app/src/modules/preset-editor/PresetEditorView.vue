@@ -11,6 +11,7 @@ const path = ref('')
 const loading = ref(false)
 const error = ref('')
 const collapsedSections = ref<Set<string>>(new Set())
+const isDragging = ref(false)
 
 // ── Preset type detection ───────────────────────────────────────────
 
@@ -19,10 +20,7 @@ const isSound = computed(() => rootName.value === 'sound')
 
 // ── Load from file ──────────────────────────────────────────────────
 
-function handleFileUpload(event: Event) {
-  const input = event.target as HTMLInputElement
-  if (!input.files || !input.files[0]) return
-  const file = input.files[0]
+function loadFile(file: File) {
   error.value = ''
   loading.value = true
 
@@ -46,7 +44,37 @@ function handleFileUpload(event: Event) {
     loading.value = false
   }
   reader.readAsText(file)
+}
+
+function handleFileUpload(event: Event) {
+  const input = event.target as HTMLInputElement
+  if (!input.files || !input.files[0]) return
+  loadFile(input.files[0])
   input.value = ''
+}
+
+// ── Drag and drop ──────────────────────────────────────────────────
+
+function onDragOver(event: DragEvent) {
+  event.preventDefault()
+  isDragging.value = true
+}
+
+function onDragLeave() {
+  isDragging.value = false
+}
+
+function onDrop(event: DragEvent) {
+  event.preventDefault()
+  isDragging.value = false
+  const file = event.dataTransfer?.files?.[0]
+  if (!file) return
+  const ext = file.name.split('.').pop()?.toLowerCase()
+  if (ext !== 'xml') {
+    error.value = `Unsupported file type ".${ext}" — drop a .xml preset file`
+    return
+  }
+  loadFile(file)
 }
 
 // ── Load from Deluge ────────────────────────────────────────────────
@@ -256,7 +284,14 @@ function toggleSource(index: number) {
 </script>
 
 <template>
-  <div class="p-6 space-y-6">
+  <div
+    class="p-6 space-y-6"
+    :class="isDragging ? 'ring-2 ring-blue-400/60 bg-blue-500/5' : ''"
+    data-testid="preset-editor-view"
+    @drop="onDrop"
+    @dragover="onDragOver"
+    @dragleave="onDragLeave"
+  >
     <h2 class="text-xl font-semibold text-zinc-200">Preset Editor</h2>
 
     <!-- Load controls -->
@@ -438,7 +473,7 @@ function toggleSource(index: number) {
       <svg class="w-12 h-12 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
         <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
       </svg>
-      <p class="text-sm">Load a preset XML file or enter a Deluge path to view parameters.</p>
+      <p class="text-sm">Drop a preset XML file here, use the file picker, or enter a Deluge path.</p>
     </div>
   </div>
 </template>
