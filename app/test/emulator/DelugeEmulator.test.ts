@@ -98,7 +98,7 @@ describe('DelugeEmulator request/response correlation', () => {
     expect(r2.type).toBe('registers')
   })
 
-  test('reply with ok=false rejects', async () => {
+  test('reply with ok=false resolves with the error reply', async () => {
     const p = em.start()
     const sent = worker.postMessage.mock.calls[0][0]
     worker.emit({
@@ -107,7 +107,9 @@ describe('DelugeEmulator request/response correlation', () => {
       ok: false,
       error: 'ELF not loaded',
     })
-    await expect(p).rejects.toThrow(/ELF not loaded/)
+    const reply = await p
+    expect(reply.ok).toBe(false)
+    expect(reply.error).toBe('ELF not loaded')
   })
 
   test('unmatched replies are ignored', async () => {

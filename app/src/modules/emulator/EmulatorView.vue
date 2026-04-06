@@ -111,6 +111,10 @@ async function bootEmulator() {
 }
 
 async function shutdownEmulator() {
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId)
+    rafId = null
+  }
   unwireSubscriptions()
   if (audioEnabled.value) {
     await audioBridge.stop()
@@ -196,6 +200,34 @@ async function loadFirmware(buffer: ArrayBuffer) {
   refreshPerf()
 }
 
+// ---------------------------------------------------------------------------
+// Continuous execution loop
+// ---------------------------------------------------------------------------
+
+/** Instructions per step batch — tuned so each batch takes ~8–12 ms. */
+const STEP_BATCH = 200_000
+let rafId: number | null = null
+
+function runLoop() {
+  if (!running.value || !ready.value) {
+    rafId = null
+    return
+  }
+  const t0 = performance.now()
+  emulatorStore.emulator.step(STEP_BATCH).then((reply) => {
+    if (reply.type === 'stepped') {
+      perfStats.record(reply.executed, performance.now() - t0)
+      refreshPerf()
+    }
+    if (running.value) {
+      rafId = requestAnimationFrame(runLoop)
+    }
+  }).catch(() => {
+    running.value = false
+    rafId = null
+  })
+}
+
 async function onStart() {
   if (!ready.value) return
   const reply = await emulatorStore.emulator.start()
@@ -204,12 +236,17 @@ async function onStart() {
     return
   }
   running.value = true
+  rafId = requestAnimationFrame(runLoop)
 }
 
 async function onStop() {
   if (!ready.value) return
   await emulatorStore.emulator.stop()
   running.value = false
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId)
+    rafId = null
+  }
 }
 
 async function onStep() {
@@ -225,6 +262,10 @@ async function onStep() {
 
 async function onReset() {
   if (!ready.value) return
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId)
+    rafId = null
+  }
   await emulatorStore.emulator.reset()
   elfLoaded.value = false
   running.value = false
@@ -349,6 +390,11 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  if (rafId !== null) {
+    cancelAnimationFrame(rafId)
+    rafId = null
+  }
+  running.value = false
   unwireSubscriptions()
   // Don't shut the singleton down — other views share it.
 })

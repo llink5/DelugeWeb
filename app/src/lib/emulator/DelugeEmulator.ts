@@ -45,6 +45,16 @@ export class DelugeEmulator {
     if (this.worker) throw new Error('Worker already attached')
     this.worker = worker
     worker.onmessage = (evt: MessageEvent<WorkerToMain>) => this.handleMessage(evt.data)
+    worker.onerror = (evt: ErrorEvent) => {
+      const msg = evt.message ?? 'Worker error (no details — check DevTools → Sources → Worker)'
+      console.error('[DelugeEmulator] worker error:', msg)
+      // Reject all pending requests so callers don't hang for 30 s.
+      for (const p of this.pending.values()) {
+        clearTimeout(p.timer)
+        p.reject(new Error(msg))
+      }
+      this.pending.clear()
+    }
   }
 
   /** Release the worker without terminating it (tests only). */
@@ -244,11 +254,9 @@ export class DelugeEmulator {
       if (!pending) return
       clearTimeout(pending.timer)
       this.pending.delete(msg.replyTo)
-      if (msg.ok) {
-        pending.resolve(msg)
-      } else {
-        pending.reject(new Error(msg.error ?? 'Unknown emulator error'))
-      }
+      // Always resolve — callers inspect reply.ok to decide on errors.
+      // Rejecting here would skip the callers' structured error handling.
+      pending.resolve(msg)
       return
     }
     if (isEvent(msg)) {
