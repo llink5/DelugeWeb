@@ -21,8 +21,8 @@
         "null": 0
       },
       "xmlTag": {
-        "present": 129,
-        "null": 13
+        "present": 127,
+        "null": 15
       },
       "displayName": {
         "present": 142,
@@ -1552,7 +1552,7 @@
       },
       {
         "id": "UNPATCHED_VOLUME",
-        "xmlTag": "volume",
+        "xmlTag": null,
         "displayName": "Master level",
         "shortName": null,
         "type": "integer",
@@ -1628,7 +1628,7 @@
       },
       {
         "id": "UNPATCHED_PITCH_ADJUST",
-        "xmlTag": "pitchAdjust",
+        "xmlTag": null,
         "displayName": "Master pitch",
         "shortName": null,
         "type": "integer",
